@@ -117,3 +117,20 @@ Response format:
     "available": 1                  // the number of physical copies of the book that are currently not rented out
   }
 }
+
+
+
+
+
+
+curl \
+--request POST \
+--header "Content-Type: application/json" \
+--data '
+{
+   "title": "any",
+   "author":  "joe doe",
+   "category": "scifi",
+   "total": 1
+}
+' http://localhost:8080/book/add
