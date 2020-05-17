@@ -134,3 +134,18 @@ curl \
    "total": 1
 }
 ' http://localhost:8080/book/add
+
+
+curl \
+--request POST \
+--header "Content-Type: application/json" \
+--data '
+{
+   "title": "titanic",
+   "genre": ["Drama", "Romance"],
+   "total": 1
+}
+' http://localhost:8080/movie/add
+
+
+
