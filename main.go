@@ -26,7 +26,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 	var incomingaddbook app.IncomingAddBook
 	var incomingaddmovie app.IncomingAddMovie
-	var incomingrentbook app.IncomingRentBook
+	var incomingrent app.IncomingRent
 	var responseAdd	app.ResponseAdd
 	var responseRent app.ResponseRent
 
@@ -63,7 +63,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 	if r.URL.Path == "/book/rent" {
 
-		err := json.NewDecoder(r.Body).Decode(&incomingrentbook)
+		err := json.NewDecoder(r.Body).Decode(&incomingrent)
 		if err != nil {
 			fmt.Println(err)
 			w.Header().Set("Content-Type", "application/json; charset=UTF-8")
@@ -72,11 +72,27 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		}
 
 
-		responseRent = library.RentBook(incomingrentbook.ID,incomingrentbook.UserID)
+		responseRent = library.RentBook(incomingrent.ID,incomingrent.UserID)
 		responseJSON, _ := json.Marshal(responseRent)
 		fmt.Fprintf(w, "Response: %s\n", responseJSON)
 
 	}
 
+	if r.URL.Path == "/movie/rent" {
+
+		err := json.NewDecoder(r.Body).Decode(&incomingrent)
+		if err != nil {
+			fmt.Println(err)
+			w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+
+		responseRent = library.RentMovie(incomingrent.ID,incomingrent.UserID)
+		responseJSON, _ := json.Marshal(responseRent)
+		fmt.Fprintf(w, "Response: %s\n", responseJSON)
+
+	}
 
 }
