@@ -6,7 +6,7 @@ Let's create an API for a library with books and movies. Let's build the followi
 Request:
 {
   "title": "Book Title",
-  "author": "Author Name",
+  "author": "Author Name", 
   "category": "fiction",
   "total": 1               // number of physical copies of this book that will be available in the library
 }

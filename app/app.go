@@ -6,9 +6,9 @@ import (
 	_ "errors" // we would need this package
 	"fmt"
 	_ "fmt"   // we would need this package
-	"strconv" // we would need this package
+	_ "strconv" // we would need this package
 	"sync"
-	"time" // we would need this package
+	_ "time" // we would need this package
 )
 
 // IncomingAddBook : here you tell us what IncomingAddBook is
@@ -110,6 +110,9 @@ func NewLibrary() *Library {
 	var movieDBMap = make(map[string]*Movie)
 	var userDBMap = make(map[int]*[]Item)
 
+	var BookCopies = make(map[string]int)
+	var MovieCopies= make(map[string]int)
+
 	
 	return &Library{
 		BookDB: BookDB{
@@ -124,6 +127,8 @@ func NewLibrary() *Library {
 		Book: Book{},
 		Movie: Movie{},
 		User: User{},
+		BookCopies: BookCopies,
+		MovieCopies: MovieCopies,
 	}
 }
 
@@ -180,9 +185,7 @@ func (udb *UserDB) addUserDB(it Item, userid int) {
 // This function receives an string and generates a Unique ID
 func generateHash(title string) string {
 
-	now := time.Now().UnixNano()
-	t := strconv.FormatInt(now, 10)
-	s := title + t
+	s := title
 	bs := md5.New()
 	bs.Write([]byte(s))
 	hash1 := hex.EncodeToString(bs.Sum(nil)[:3])
@@ -199,6 +202,16 @@ func (l *Library) AddBook(title string, author string, category string, total  i
 	ID := generateHash(title)
 
 	l.BookDB.addBookDB(ID,title,author,category,total)
+
+	// Add book copies to BookCopies map
+
+	fmt.Printf("Total book copies before adding %s is : %d\n", ID, l.BookCopies[ID])
+
+
+	l.BookCopies[ID] += total 
+
+	fmt.Printf("Total book copies after adding %s is : %d\n", ID, l.BookCopies[ID])
+
 
 	response := ResponseAdd{
 		ID:      ID,
@@ -221,13 +234,19 @@ func (l *Library) AddMovie(title string, genre []string, total  int) ResponseAdd
 
 	l.MovieDB.addMovieDB(ID,title, genre, total)
 
-	response := ResponseAdd{
+	fmt.Printf("Total movie copies before adding %s is : %d\n", ID, l.MovieCopies[ID])
+
+
+	l.MovieCopies[ID] += total 
+
+	fmt.Printf("Total movie copies after adding %s is : %d\n", ID, l.MovieCopies[ID])
+
+
+	return ResponseAdd{
 		ID:      ID,
 		Success: true,
 		Message: "",
 	}
-
-	return response
 
 }
 
@@ -235,58 +254,93 @@ func (l *Library) AddMovie(title string, genre []string, total  int) ResponseAdd
 // RentBook : RentBook
 func (l *Library) RentBook(ID string, userid int) ResponseRent {
 
-	response := ResponseRent{
-		Success: true,
-		Message: "",
-	}
-
 	// if the userid does not exists, first initialize
 
 	if _, ok := l.UserDB.userDBMap[userid]; ok {
-		fmt.Printf("userdb is present in map")
+		fmt.Printf("userdb is present in map\n")
 	} else {
-		fmt.Printf("userdb is NOT present in map.")
+		fmt.Printf("userdb is NOT present in map.\n")
 		l.UserDB.userDBMap = map[int]*[]Item{
 			userid: {},
 		}
-		fmt.Printf("userdb is JUST present in map.")
+		fmt.Printf("userdb is JUST present in map.\n")
 	}
 
-	b := l.BookDB.bookDBMap[ID]
+	if b,ok := l.BookDB.bookDBMap[ID]; ok {
+		fmt.Println("este es la movie a rentar", b)
 
-	l.UserDB.addUserDB(*b,userid)
+		l.UserDB.addUserDB(*b,userid)
 
-	return response
+		fmt.Printf("Total book copies before removing %s is : %d\n", ID, l.BookCopies[ID])
+
+		if l.BookCopies[ID] > 0 {
+			l.BookCopies[ID] --
+		} else {
+			fmt.Printf("There is no more copies of this ID: %s", ID)
+			return ResponseRent{
+				Success: false,
+				Message: "Error",
+			}
+		}
+
+		fmt.Printf("Total book copies after removing %s is : %d\n", ID, l.BookCopies[ID])
+
+
+	} else {
+		fmt.Println("This id does not exists")
+		return ResponseRent{
+			Success: false,
+			Message: "Error",
+		}
+	}
+
+
+	return ResponseRent{
+		Success: true,
+		Message: "",
+	}
 
 }
 
 // RentMovie : RentMovie
 func (l *Library) RentMovie(ID string, userid int) ResponseRent {
 
-	response := ResponseRent{
-		Success: true,
-		Message: "",
-	}
 
 	if _, ok := l.UserDB.userDBMap[userid]; ok {
-		fmt.Printf("userdb is present in map")
+		fmt.Printf("userdb is present in map\n")
 	} else {
-		fmt.Printf("userdb is NOT present in map.")
+		fmt.Printf("userdb is NOT present in map.\n")
 		l.UserDB.userDBMap = map[int]*[]Item{
 			userid: {},
 		}
 	}
 
-	m := l.MovieDB.movieDBMap[ID]
+	if m, ok := l.MovieDB.movieDBMap[ID]; ok {
+		fmt.Println("este es la movie a rentar", m)
 
-	fmt.Println("este es la movie a rentar", m)
+		l.UserDB.addUserDB(*m,userid)
+		
+		fmt.Printf("Total movie copies before removing %s is : %d\n", ID, l.MovieCopies[ID])
 
 
-	//addUserDB
+		l.MovieCopies[ID] --
 
-	l.UserDB.addUserDB(*m,userid)
+		fmt.Printf("Total movie copies after adding %s is : %d\n", ID, l.MovieCopies[ID])
 
-	return response
+	} else {
+		fmt.Println("This id does not exists")
+		return ResponseRent{
+			Success: false,
+			Message: "Error",
+		}
+	}
+
+
+
+	return ResponseRent{
+		Success: true,
+		Message: "",
+	}
 
 }
 
