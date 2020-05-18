@@ -95,4 +95,22 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 	}
 
+
+	if r.URL.Path == "/book/return" {
+
+		err := json.NewDecoder(r.Body).Decode(&incomingrent)
+		if err != nil {
+			fmt.Println(err)
+			w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+
+		responseRent = library.ReturnBook(incomingrent.ID,incomingrent.UserID)
+		responseJSON, _ := json.Marshal(responseRent)
+		fmt.Fprintf(w, "Response: %s\n", responseJSON)
+
+	}
+
 }

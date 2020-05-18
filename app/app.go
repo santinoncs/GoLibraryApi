@@ -170,16 +170,49 @@ func (mdb *MovieDB) addMovieDB(ID string, title string, genre []string, total in
 // addUserDB : addUserDB
 func (udb *UserDB) addUserDB(it Item, userid int) {
 
-	fmt.Println("antes de setear", *udb.userDBMap[userid])
+	fmt.Println("Estamos en adduserdb antes de modificarlo", *udb.userDBMap[userid])
 
 	udb.mutex.Lock()
 	*udb.userDBMap[userid] = append(*udb.userDBMap[userid], it)
 	udb.mutex.Unlock()
 
-	fmt.Println("despues de seetear",*udb.userDBMap[userid])
+	fmt.Println("Estamos en adduserdb despues de modificarlo",*udb.userDBMap[userid])
 
 }
 
+// addUserDB : addUserDB
+func (udb *UserDB) removeUserDB(it Item, userid int) {
+
+	fmt.Println("EStamos en removeuserdb antes de modificarlo", *udb.userDBMap[userid])
+
+	udb.mutex.Lock()
+
+	//bookItem := Book{}
+
+	if it.ItemType() == "book" {
+		bookItem, _ := it.(Book)
+		fmt.Println(bookItem)
+	}
+
+	arr := *udb.userDBMap[userid]
+
+	i := 0 // output index
+	for _, x := range *udb.userDBMap[userid] {
+		if x == it {
+			// copy and increment index
+			arr[i] = x
+			i++
+		}
+	}
+	arr = arr[:i]
+
+	*udb.userDBMap[userid] = arr
+
+	udb.mutex.Unlock()
+
+	fmt.Println("Estamos en removeuserdb despues de modificarlo",*udb.userDBMap[userid])
+
+}
 
 
 // This function receives an string and generates a Unique ID
@@ -267,23 +300,19 @@ func (l *Library) RentBook(ID string, userid int) ResponseRent {
 	}
 
 	if b,ok := l.BookDB.bookDBMap[ID]; ok {
-		fmt.Println("este es la movie a rentar", b)
+		fmt.Println("este es el book a rentar", b)
 
 		l.UserDB.addUserDB(*b,userid)
-
-		fmt.Printf("Total book copies before removing %s is : %d\n", ID, l.BookCopies[ID])
 
 		if l.BookCopies[ID] > 0 {
 			l.BookCopies[ID] --
 		} else {
-			fmt.Printf("There is no more copies of this ID: %s", ID)
 			return ResponseRent{
 				Success: false,
 				Message: "Error",
 			}
 		}
 
-		fmt.Printf("Total book copies after removing %s is : %d\n", ID, l.BookCopies[ID])
 
 
 	} else {
@@ -319,13 +348,11 @@ func (l *Library) RentMovie(ID string, userid int) ResponseRent {
 		fmt.Println("este es la movie a rentar", m)
 
 		l.UserDB.addUserDB(*m,userid)
-		
-		fmt.Printf("Total movie copies before removing %s is : %d\n", ID, l.MovieCopies[ID])
 
 
 		l.MovieCopies[ID] --
 
-		fmt.Printf("Total movie copies after adding %s is : %d\n", ID, l.MovieCopies[ID])
+
 
 	} else {
 		fmt.Println("This id does not exists")
@@ -344,4 +371,46 @@ func (l *Library) RentMovie(ID string, userid int) ResponseRent {
 
 }
 
+// ReturnBook : ReturnBook
+func (l *Library) ReturnBook(ID string, userid int) ResponseRent {
+
+	if b,ok := l.BookDB.bookDBMap[ID]; ok {
+
+		fmt.Println("Queremos devolver un book con ID:", ID)
+
+		l.UserDB.removeUserDB(*b,userid)
+
+
+
+		if l.BookCopies[ID] > 0 {
+			l.BookCopies[ID] --
+			fmt.Printf("There are still copies of this ID: %s", ID)
+			fmt.Println("number of copies are:",l.BookCopies[ID])
+		} else {
+			fmt.Printf("There is no more copies of this ID: %s", ID)
+			fmt.Println("number of copies are:",l.BookCopies[ID])
+			return ResponseRent{
+				Success: false,
+				Message: "Error",
+			}
+		}
+
+
+
+
+	} else {
+		fmt.Println("This id does not exists")
+		return ResponseRent{
+			Success: false,
+			Message: "Error",
+		}
+	}
+
+
+	return ResponseRent{
+		Success: true,
+		Message: "",
+	}
+
+}
 
