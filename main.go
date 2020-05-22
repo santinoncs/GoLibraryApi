@@ -5,6 +5,7 @@ import (
 	app "github.com/santinoncs/LibraryApi/app"
 	"encoding/json"
 	"net/http"
+	"net/url"
 )
 
 var library *app.Library
@@ -29,6 +30,10 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	var incomingrent app.IncomingRent
 	var responseAdd	app.ResponseAdd
 	var responseRent app.ResponseRent
+
+
+
+
 
 	if r.URL.Path == "/book/add" {
 
@@ -110,6 +115,17 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		responseRent = library.ReturnBook(incomingrent.ID,incomingrent.UserID)
 		responseJSON, _ := json.Marshal(responseRent)
 		fmt.Fprintf(w, "Response: %s\n", responseJSON)
+
+	}
+
+
+	m, _ := url.ParseQuery(r.URL.RawQuery)
+	
+
+	if r.URL.Path == "/book" {
+		parametro := m["id"]
+
+		fmt.Println(parametro)
 
 	}
 
