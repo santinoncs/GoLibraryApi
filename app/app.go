@@ -3,10 +3,8 @@ package app
 import (
 	"crypto/md5"
 	"encoding/hex"
-	_ "errors" // we would need this package
+	"errors" // we would need this package
 	"fmt"
-	_ "fmt"   // we would need this package
-	_ "strconv" // we would need this package
 	"sync"
 	_ "time" // we would need this package
 )
@@ -48,10 +46,10 @@ type Library struct {
 // Book : Book struct
 type Book struct {
 	ID       string
-	title	 string
-	author	 string
-	category string
-	total	 int
+	Title	 string
+	Author	 string
+	Category string
+	Total	 int
 }
 
 // Movie : Movie struct
@@ -83,6 +81,13 @@ type ResponseAdd struct {
 type ResponseRent struct {
 	Success bool
 	Message string
+}
+
+// ResponseInfo : ResponseInfo
+type ResponseInfo struct {
+	Success bool
+	Message string
+	Book
 }
 
 // BookDB : BookDB
@@ -177,23 +182,31 @@ func (bc *BookCopies) decrementBookCopies(ID string) {
 func (bdb *BookDB) addBookDB(ID string,title string, author string, category string, total  int) {
 
 	bdb.mutex.Lock()
-	bdb.bookDBMap[ID] = &Book{ID: ID,title: title, author: author,category: category,total: total}
+	bdb.bookDBMap[ID] = &Book{ID: ID,Title: title, Author: author,Category: category,Total: total}
 	bdb.mutex.Unlock()
+
+}
+
+// getBookDB :
+func (bdb *BookDB) getBookDB(ID string) (Book, error) {
+
+	if _, ok := bdb.bookDBMap[ID]; ok {	
+		bdb.mutex.Lock()
+		
+		bookinfo := bdb.bookDBMap[ID] 
+		bdb.mutex.Unlock()
+		return *bookinfo,nil
+	}
+	return Book{}, errors.New("Item does not exist")
 
 }
 
 // NewMovie db :
 func (mdb *MovieDB) addMovieDB(ID string, title string, genre []string, total int) {
 
-	fmt.Println("antes de add movie db",  mdb.movieDBMap[ID])
-
-
 	mdb.mutex.Lock()
 	mdb.movieDBMap[ID] = &Movie{ID: ID,title: title, genre: genre, total: total}
 	mdb.mutex.Unlock()
-
-	fmt.Println("despues de add movie db",  mdb.movieDBMap[ID])
-
 
 }
 
@@ -201,20 +214,16 @@ func (mdb *MovieDB) addMovieDB(ID string, title string, genre []string, total in
 // addUserDB : addUserDB
 func (udb *UserDB) addUserDB(it Item, userid int) {
 
-	fmt.Println("Estamos en adduserdb antes de modificarlo", *udb.userDBMap[userid])
 
 	udb.mutex.Lock()
 	*udb.userDBMap[userid] = append(*udb.userDBMap[userid], it)
 	udb.mutex.Unlock()
-
-	fmt.Println("Estamos en adduserdb despues de modificarlo",*udb.userDBMap[userid])
 
 }
 
 // addUserDB : addUserDB
 func (udb *UserDB) removeUserDB(it Item, userid int) {
 
-	fmt.Println("EStamos en removeuserdb antes de modificarlo", *udb.userDBMap[userid])
 
 	udb.mutex.Lock()
 
@@ -227,36 +236,30 @@ func (udb *UserDB) removeUserDB(it Item, userid int) {
 
 	arr := *udb.userDBMap[userid]
 
-	fmt.Println("Este es el array antes de modificarlo", arr)
 
 	i := 0 // output index
 	for _, x := range *udb.userDBMap[userid] {
 		if x == it {
 			// copy and increment index
-			fmt.Println("Entando en condicional", x)
 			//arr[i] = x
-			fmt.Println("Este es el valor de arr[i]:", arr[i])
 			//i++
 		} else {
 			// son diferentes, copia el elemento en el array
-			fmt.Println("son diferentes", x)
 			arr[i] = x
 			i++
 		}
 	}
 
-	fmt.Println("Este es el valor de arr[:i]:", arr[:i])
 
 	arr = arr[:i]
 
-	fmt.Println("Este es el array despues de modificarlo", arr)
 
 
 	*udb.userDBMap[userid] = arr
 
 	udb.mutex.Unlock()
 
-	fmt.Println("Estamos en removeuserdb despues de modificarlo",*udb.userDBMap[userid])
+
 
 }
 
@@ -276,24 +279,12 @@ func generateHash(title string) string {
 // AddBook : This could be a method implementing an interface -> additem
 func (l *Library) AddBook(title string, author string, category string, total  int) ResponseAdd {
 
-	// if does not exists, you can add it
-
 	ID := generateHash(title)
 
 	l.BookDB.addBookDB(ID,title,author,category,total)
 
-	// Add book copies to BookCopies map
-
-	fmt.Printf("Total book copies before adding %s is : %d\n", ID, l.BookCopies.BookCopiesMap[ID])
-
-
-	//l.BookCopies.BookCopiesMap[ID] = 0 
 
 	l.BookCopies.incrementBookCopies(ID,total)
-
-	fmt.Printf("Total book copies after adding %s is : %d\n", ID, l.BookCopies.BookCopiesMap[ID])
-
-
 
 	response := ResponseAdd{
 		ID:      ID,
@@ -314,12 +305,7 @@ func (l *Library) AddMovie(title string, genre []string, total  int) ResponseAdd
 
 	l.MovieDB.addMovieDB(ID,title, genre, total)
 
-	fmt.Printf("Total movie copies before adding %s is : %d\n", ID, l.MovieCopies[ID])
-
-
 	l.MovieCopies[ID] += total 
-
-	fmt.Printf("Total movie copies after adding %s is : %d\n", ID, l.MovieCopies[ID])
 
 
 	return ResponseAdd{
@@ -340,22 +326,17 @@ func (l *Library) RentBook(ID string, userid int) ResponseRent {
 	if _, ok := l.UserDB.userDBMap[userid]; ok {
 		fmt.Printf("userdb is present in map\n")
 	} else {
-		fmt.Printf("userdb is NOT present in map.\n")
 		l.UserDB.userDBMap = map[int]*[]Item{
 			userid: {},
 		}
-		fmt.Printf("userdb is JUST present in map.\n")
 	}
 
 	if b,ok := l.BookDB.bookDBMap[ID]; ok {
-		fmt.Println("este es el book a rentar", b)
 
 		l.UserDB.addUserDB(*b,userid)
 
 		if l.BookCopies.BookCopiesMap[ID] > 0 {
-			fmt.Println("decrementing...")
 			l.decrementBookCopies(ID)
-			fmt.Printf("Total book copies after decrement  %s is : %d\n", ID, l.BookCopies.BookCopiesMap[ID])
 		} else {
 			return ResponseRent{
 				Success: false,
@@ -366,7 +347,6 @@ func (l *Library) RentBook(ID string, userid int) ResponseRent {
 
 
 	} else {
-		fmt.Println("This id does not exists")
 		return ResponseRent{
 			Success: false,
 			Message: "Error",
@@ -388,24 +368,17 @@ func (l *Library) RentMovie(ID string, userid int) ResponseRent {
 	if _, ok := l.UserDB.userDBMap[userid]; ok {
 		fmt.Printf("userdb is present in map\n")
 	} else {
-		fmt.Printf("userdb is NOT present in map.\n")
 		l.UserDB.userDBMap = map[int]*[]Item{
 			userid: {},
 		}
 	}
 
 	if m, ok := l.MovieDB.movieDBMap[ID]; ok {
-		fmt.Println("este es la movie a rentar", m)
 
 		l.UserDB.addUserDB(*m,userid)
-
-
 		l.MovieCopies[ID] --
 
-
-
 	} else {
-		fmt.Println("This id does not exists")
 		return ResponseRent{
 			Success: false,
 			Message: "Error",
@@ -426,31 +399,13 @@ func (l *Library) ReturnBook(ID string, userid int) ResponseRent {
 
 	if b,ok := l.BookDB.bookDBMap[ID]; ok {
 
-		fmt.Println("Queremos devolver un book con ID:", ID)
 
 		l.UserDB.removeUserDB(*b,userid)
 
-
-
-		//if l.BookCopies.BookCopiesMap[ID] > 0 {
-			//l.BookCopies[ID] --
-			l.incrementBookCopies(ID,1)
-			fmt.Printf("There are still copies of this ID: %s", ID)
-			fmt.Println("number of copies are:",l.BookCopies.BookCopiesMap[ID])
-		//} else {
-			// fmt.Printf("There is no more copies of this ID: %s", ID)
-			// fmt.Println("number of copies are:",l.BookCopies.BookCopiesMap[ID])
-			// return ResponseRent{
-			// 	Success: false,
-			// 	Message: "Error",
-			// }
-		//}
-
-
+		l.incrementBookCopies(ID,1)
 
 
 	} else {
-		fmt.Println("This id does not exists")
 		return ResponseRent{
 			Success: false,
 			Message: "Error",
@@ -465,3 +420,24 @@ func (l *Library) ReturnBook(ID string, userid int) ResponseRent {
 
 }
 
+// BookInfo : BookInfo
+func (l *Library) BookInfo(bookid string) ResponseInfo {
+
+
+	bookinfo,err := l.BookDB.getBookDB(bookid)
+	if err != nil {
+		return ResponseInfo{
+			Success: false,
+			Message: "Error",
+			Book: Book{},
+		}
+	}
+
+
+	return ResponseInfo{
+		Success: true,
+		Message: "",
+		Book: bookinfo,
+	}
+
+}

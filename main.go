@@ -30,9 +30,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	var incomingrent app.IncomingRent
 	var responseAdd	app.ResponseAdd
 	var responseRent app.ResponseRent
-
-
-
+	var responseInfo app.ResponseInfo
 
 
 	if r.URL.Path == "/book/add" {
@@ -123,9 +121,12 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	
 
 	if r.URL.Path == "/book" {
-		parametro := m["id"]
+		bookid := m["id"]
 
-		fmt.Println(parametro)
+		responseInfo = library.BookInfo(bookid[0])
+		responseJSON, _ := json.Marshal(responseInfo)
+		fmt.Fprintf(w, "Response: %s\n", responseJSON)
+
 
 	}
 
