@@ -122,12 +122,8 @@ func NewLibrary() *Library {
 	var movieDBMap = make(map[string]*Movie)
 	var userDBMap = make(map[int]*[]Item)
 
-	
-
 	var BookCopiesMap = make(map[string]int)
 	var MovieCopies= make(map[string]int)
-
-	
 	
 	return &Library{
 		BookDB: BookDB{
@@ -162,7 +158,6 @@ func (m Movie) ItemType() string {
 // incrementBookCopies :  incrementBookCopies
 func (bc *BookCopies) incrementBookCopies(ID string, total int) {
 
-
 	bc.mutex.Lock()
 	bc.BookCopiesMap[ID] += total
 	bc.mutex.Unlock()
@@ -187,11 +182,11 @@ func (bdb *BookDB) addBookDB(ID string,title string, author string, category str
 
 }
 
-// getBookDB :
+// getBookDB : getBookDB
 func (bdb *BookDB) getBookDB(ID string) (Book, error) {
 
 	if _, ok := bdb.bookDBMap[ID]; ok {	
-		bdb.mutex.Lock()
+		bdb.mutex.RLock()
 		
 		bookinfo := bdb.bookDBMap[ID] 
 		bdb.mutex.Unlock()
@@ -210,10 +205,8 @@ func (mdb *MovieDB) addMovieDB(ID string, title string, genre []string, total in
 
 }
 
-
 // addUserDB : addUserDB
 func (udb *UserDB) addUserDB(it Item, userid int) {
-
 
 	udb.mutex.Lock()
 	*udb.userDBMap[userid] = append(*udb.userDBMap[userid], it)
@@ -227,15 +220,7 @@ func (udb *UserDB) removeUserDB(it Item, userid int) {
 
 	udb.mutex.Lock()
 
-	// Esto se puede quitar ????
-
-	if it.ItemType() == "book" {
-		bookItem, _ := it.(Book)
-		fmt.Println(bookItem)
-	}
-
 	arr := *udb.userDBMap[userid]
-
 
 	i := 0 // output index
 	for _, x := range *udb.userDBMap[userid] {
@@ -253,13 +238,9 @@ func (udb *UserDB) removeUserDB(it Item, userid int) {
 
 	arr = arr[:i]
 
-
-
 	*udb.userDBMap[userid] = arr
 
 	udb.mutex.Unlock()
-
-
 
 }
 
@@ -282,7 +263,6 @@ func (l *Library) AddBook(title string, author string, category string, total  i
 	ID := generateHash(title)
 
 	l.BookDB.addBookDB(ID,title,author,category,total)
-
 
 	l.BookCopies.incrementBookCopies(ID,total)
 
@@ -385,8 +365,6 @@ func (l *Library) RentMovie(ID string, userid int) ResponseRent {
 		}
 	}
 
-
-
 	return ResponseRent{
 		Success: true,
 		Message: "",
@@ -411,8 +389,7 @@ func (l *Library) ReturnBook(ID string, userid int) ResponseRent {
 			Message: "Error",
 		}
 	}
-
-
+	
 	return ResponseRent{
 		Success: true,
 		Message: "",
