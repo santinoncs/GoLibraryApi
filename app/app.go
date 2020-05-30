@@ -13,14 +13,14 @@ type IncomingAddBook struct {
 	Title    string `json:"title"`
 	Author   string `json:"author"`
 	Category string `json:"category"`
-	Total    int    `json:"total"`
+	Total    uint64    `json:"total"`
 }
 
 // IncomingAddMovie : here you tell us what IncomingAddMovie is
 type IncomingAddMovie struct {
 	Title string   `json:"title"`
 	Genre []string `json:"genre"`
-	Total int      `json:"total"`
+	Total uint64      `json:"total"`
 }
 
 // IncomingRent : here you tell us what IncomingRent is
@@ -36,10 +36,8 @@ type Library struct {
 	BookDB
 	MovieDB
 	UserDB
-	BookCopies  // this was map[string]*int before..but it didnt work
-	MovieCopies map[uint64]int
 	User
-	ops uint64
+	autoinc uint64
 }
 
 // Book : Book struct
@@ -47,14 +45,16 @@ type Book struct {
 	Item
 	Author   string
 	Category string
-	Total    int
+	//Total    int
+	copies   uint64
 }
 
 // Movie : Movie struct
 type Movie struct {
 	genre []string //["Drama", "Romance"]
 	Item
-	total int
+	//total  int
+	copies uint64
 }
 
 // User : User struct
@@ -106,11 +106,6 @@ type UserDB struct {
 	mutex     sync.RWMutex
 }
 
-// BookCopies : BookCopies
-type BookCopies struct {
-	BookCopiesMap map[uint64]int
-	mutex         sync.RWMutex
-}
 
 // NewLibrary : Constructor of Library struct
 func NewLibrary() *Library {
@@ -118,9 +113,6 @@ func NewLibrary() *Library {
 	var bookDBMap = make(map[uint64]*Book)
 	var movieDBMap = make(map[uint64]*Movie)
 	var userDBMap = make(map[int]*[]Item)
-
-	var BookCopiesMap = make(map[uint64]int)
-	var MovieCopies = make(map[uint64]int)
 
 	return &Library{
 		BookDB: BookDB{
@@ -135,37 +127,20 @@ func NewLibrary() *Library {
 		Book:  Book{Item: Item{}},
 		Movie: Movie{Item: Item{}},
 		User:  User{},
-		BookCopies: BookCopies{
-			BookCopiesMap: BookCopiesMap,
-		},
-		MovieCopies: MovieCopies,
 	}
 }
 
-// incrementBookCopies :  incrementBookCopies
-func (bc *BookCopies) incrementBookCopies(ID uint64, total int) {
-
-	bc.mutex.Lock()
-	bc.BookCopiesMap[ID] += total
-	bc.mutex.Unlock()
-
-}
-
-// decrementBookCopies :  decrementBookCopies
-func (bc *BookCopies) decrementBookCopies(ID uint64) {
-
-	bc.mutex.Lock()
-	bc.BookCopiesMap[ID]--
-	bc.mutex.Unlock()
-
-}
 
 // NewBook db :
-func (bdb *BookDB) addBookDB(ID uint64, title string, author string, category string, total int) {
+func (bdb *BookDB) addBookDB(ID uint64, title string, author string, category string, total uint64) {
+
+
 
 	bdb.mutex.Lock()
-	bdb.bookDBMap[ID] = &Book{Item: Item{ID: ID, Title: title}, Author: author, Category: category, Total: total}
+	bdb.bookDBMap[ID] = &Book{Item: Item{ID: ID, Title: title}, Author: author, Category: category}
 	bdb.mutex.Unlock()
+
+	atomic.AddUint64(&bdb.bookDBMap[ID].copies, total)
 
 }
 
@@ -184,11 +159,15 @@ func (bdb *BookDB) getBookDB(ID uint64) (Book, error) {
 }
 
 // NewMovie db :
-func (mdb *MovieDB) addMovieDB(ID uint64, title string, genre []string, total int) {
+func (mdb *MovieDB) addMovieDB(ID uint64, title string, genre []string, total uint64) {
+
 
 	mdb.mutex.Lock()
-	mdb.movieDBMap[ID] = &Movie{Item: Item{ID: ID, Title: title}, genre: genre, total: total}
+	mdb.movieDBMap[ID] = &Movie{Item: Item{ID: ID, Title: title}, genre: genre}
 	mdb.mutex.Unlock()
+
+	atomic.AddUint64(&mdb.movieDBMap[ID].copies, total)
+
 
 }
 
@@ -229,27 +208,16 @@ func (udb *UserDB) removeUserDB(it *Item, userid int) {
 
 }
 
-// This function receives an string and generates a Unique ID
-func generateAutoIncrement(title string) uint64 {
-
-	var ops uint64
-
-	atomic.AddUint64(&ops, 1)
-
-	return ops
-
-}
 
 // AddBook : This could be a method implementing an interface -> additem
-func (l *Library) AddBook(title string, author string, category string, total int) ResponseAdd {
+func (l *Library) AddBook(title string, author string, category string, total uint64) ResponseAdd {
 
-	atomic.AddUint64(&l.ops, 1)
+	atomic.AddUint64(&l.autoinc, 1)
 
-	ID := l.ops
+	ID := l.autoinc
 
 	l.BookDB.addBookDB(ID, title, author, category, total)
 
-	l.BookCopies.incrementBookCopies(ID, total)
 
 	response := ResponseAdd{
 		ID:      ID,
@@ -262,13 +230,14 @@ func (l *Library) AddBook(title string, author string, category string, total in
 }
 
 // AddMovie : AddMovie
-func (l *Library) AddMovie(title string, genre []string, total int) ResponseAdd {
+func (l *Library) AddMovie(title string, genre []string, total uint64) ResponseAdd {
 
-	ID := generateAutoIncrement(title)
+	atomic.AddUint64(&l.autoinc, 1)
+
+	ID := l.autoinc
 
 	l.MovieDB.addMovieDB(ID, title, genre, total)
 
-	l.MovieCopies[ID] += total
 
 	return ResponseAdd{
 		ID:      ID,
@@ -301,8 +270,9 @@ func (l *Library) RentBook(ID uint64, userid int) ResponseRent {
 
 		l.UserDB.addUserDB(&item, userid)
 
-		if l.BookCopies.BookCopiesMap[ID] > 0 {
-			l.decrementBookCopies(ID)
+		if l.BookDB.bookDBMap[ID].copies > 0 {
+			atomic.AddUint64(&l.BookDB.bookDBMap[ID].copies, ^uint64(0))
+
 		} else {
 			return ResponseRent{
 				Success: false,
@@ -344,7 +314,10 @@ func (l *Library) RentMovie(ID uint64, userid int) ResponseRent {
 
 		l.UserDB.addUserDB(&item, userid)
 
-		l.MovieCopies[ID]--
+		// Decrement
+
+		atomic.AddUint64(&l.MovieDB.movieDBMap[ID].copies, ^uint64(0))
+
 
 	} else {
 		return ResponseRent{
@@ -372,7 +345,11 @@ func (l *Library) ReturnBook(ID uint64, userid int) ResponseRent {
 
 		l.UserDB.removeUserDB(&item, userid)
 
-		l.incrementBookCopies(ID, 1)
+		// increment copies in bdb 
+
+		//l.bdb.bookDBMap[ID].copies
+		atomic.AddUint64(&l.BookDB.bookDBMap[ID].copies, 1)
+
 
 	} else {
 		return ResponseRent{
