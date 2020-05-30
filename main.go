@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
+	"strconv"
 )
 
 var library *app.Library
@@ -123,7 +124,9 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/book" {
 		bookid := m["id"]
 
-		responseInfo = library.BookInfo(bookid[0])
+		n, _ := strconv.ParseUint(bookid[0], 10, 64)
+
+		responseInfo = library.BookInfo(n)
 		responseJSON, _ := json.Marshal(responseInfo)
 		fmt.Fprintf(w, "Response: %s\n", responseJSON)
 
