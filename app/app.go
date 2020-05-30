@@ -45,8 +45,7 @@ type Library struct {
 
 // Book : Book struct
 type Book struct {
-	ID       string
-	Title	 string
+	Item
 	Author	 string
 	Category string
 	Total	 int
@@ -54,9 +53,8 @@ type Book struct {
 
 // Movie : Movie struct
 type Movie struct {
-	title	string
 	genre	[]string   //["Drama", "Romance"]
-	ID 		string
+	Item
 	total	 int
 }
 
@@ -65,10 +63,12 @@ type User struct {
 	userID	int
 }
 
+
 // Item : here you tell us what Item is
-type Item interface {
-	ItemType() string
-  }
+type Item struct {
+	ID       string
+	Title	 string
+}
 
 // ResponseAdd : ResponseAdd ack to add movie/book
 type ResponseAdd struct {
@@ -135,8 +135,8 @@ func NewLibrary() *Library {
 		UserDB: UserDB{
 			userDBMap: userDBMap,
 		},
-		Book: Book{},
-		Movie: Movie{},
+		Book: Book{Item: Item{},},
+		Movie: Movie{Item: Item{},},
 		User: User{},
 		BookCopies: BookCopies{
 			BookCopiesMap: BookCopiesMap,
@@ -177,7 +177,7 @@ func (bc *BookCopies) decrementBookCopies(ID string) {
 func (bdb *BookDB) addBookDB(ID string,title string, author string, category string, total  int) {
 
 	bdb.mutex.Lock()
-	bdb.bookDBMap[ID] = &Book{ID: ID,Title: title, Author: author,Category: category,Total: total}
+	bdb.bookDBMap[ID] = &Book{Item: Item{ID: ID,Title: title}, Author: author,Category: category,Total: total}
 	bdb.mutex.Unlock()
 
 }
@@ -200,22 +200,24 @@ func (bdb *BookDB) getBookDB(ID string) (Book, error) {
 func (mdb *MovieDB) addMovieDB(ID string, title string, genre []string, total int) {
 
 	mdb.mutex.Lock()
-	mdb.movieDBMap[ID] = &Movie{ID: ID,title: title, genre: genre, total: total}
+	mdb.movieDBMap[ID] = &Movie{Item: Item{ID: ID,Title: title}, genre: genre, total: total}
 	mdb.mutex.Unlock()
 
 }
 
 // addUserDB : addUserDB
-func (udb *UserDB) addUserDB(it Item, userid int) {
+func (udb *UserDB) addUserDB(it *Item, userid int) {
+
+
 
 	udb.mutex.Lock()
-	*udb.userDBMap[userid] = append(*udb.userDBMap[userid], it)
+	*udb.userDBMap[userid] = append(*udb.userDBMap[userid], *it)
 	udb.mutex.Unlock()
 
 }
 
 // addUserDB : addUserDB
-func (udb *UserDB) removeUserDB(it Item, userid int) {
+func (udb *UserDB) removeUserDB(it *Item, userid int) {
 
 
 	udb.mutex.Lock()
@@ -224,7 +226,7 @@ func (udb *UserDB) removeUserDB(it Item, userid int) {
 
 	i := 0 // output index
 	for _, x := range *udb.userDBMap[userid] {
-		if x == it {
+		if x == *it {
 			// copy and increment index
 			//arr[i] = x
 			//i++
@@ -313,7 +315,12 @@ func (l *Library) RentBook(ID string, userid int) ResponseRent {
 
 	if b,ok := l.BookDB.bookDBMap[ID]; ok {
 
-		l.UserDB.addUserDB(*b,userid)
+		item := Item{}
+
+		b.ID = item.ID
+		b.Title = item.Title
+
+		l.UserDB.addUserDB(&item,userid)
 
 		if l.BookCopies.BookCopiesMap[ID] > 0 {
 			l.decrementBookCopies(ID)
@@ -355,7 +362,13 @@ func (l *Library) RentMovie(ID string, userid int) ResponseRent {
 
 	if m, ok := l.MovieDB.movieDBMap[ID]; ok {
 
-		l.UserDB.addUserDB(*m,userid)
+		item := Item{}
+
+		m.ID = item.ID
+		m.Title = item.Title
+
+		l.UserDB.addUserDB(&item,userid)
+
 		l.MovieCopies[ID] --
 
 	} else {
@@ -377,8 +390,13 @@ func (l *Library) ReturnBook(ID string, userid int) ResponseRent {
 
 	if b,ok := l.BookDB.bookDBMap[ID]; ok {
 
+		item := Item{}
 
-		l.UserDB.removeUserDB(*b,userid)
+		b.ID = item.ID
+		b.Title = item.Title
+		
+
+		l.UserDB.removeUserDB(&item,userid)
 
 		l.incrementBookCopies(ID,1)
 
