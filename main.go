@@ -1,9 +1,9 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	app "github.com/santinoncs/LibraryApi/app"
-	"encoding/json"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -29,10 +29,9 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	var incomingaddbook app.IncomingAddBook
 	var incomingaddmovie app.IncomingAddMovie
 	var incomingrent app.IncomingRent
-	var responseAdd	app.ResponseAdd
+	var responseAdd app.ResponseAdd
 	var responseRent app.ResponseRent
 	var responseInfo app.ResponseInfo
-
 
 	if r.URL.Path == "/book/add" {
 
@@ -50,7 +49,6 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.URL.Path == "/movie/add" {
-
 
 		err := json.NewDecoder(r.Body).Decode(&incomingaddmovie)
 		if err != nil {
@@ -75,8 +73,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-
-		responseRent = library.RentBook(incomingrent.ID,incomingrent.UserID)
+		responseRent = library.RentBook(incomingrent.ID, incomingrent.UserID)
 		responseJSON, _ := json.Marshal(responseRent)
 		fmt.Fprintf(w, "Response: %s\n", responseJSON)
 
@@ -92,13 +89,11 @@ func handler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-
-		responseRent = library.RentMovie(incomingrent.ID,incomingrent.UserID)
+		responseRent = library.RentMovie(incomingrent.ID, incomingrent.UserID)
 		responseJSON, _ := json.Marshal(responseRent)
 		fmt.Fprintf(w, "Response: %s\n", responseJSON)
 
 	}
-
 
 	if r.URL.Path == "/book/return" {
 
@@ -110,16 +105,13 @@ func handler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-
-		responseRent = library.ReturnBook(incomingrent.ID,incomingrent.UserID)
+		responseRent = library.ReturnBook(incomingrent.ID, incomingrent.UserID)
 		responseJSON, _ := json.Marshal(responseRent)
 		fmt.Fprintf(w, "Response: %s\n", responseJSON)
 
 	}
 
-
 	m, _ := url.ParseQuery(r.URL.RawQuery)
-	
 
 	if r.URL.Path == "/book" {
 		bookid := m["id"]
@@ -129,7 +121,6 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		responseInfo = library.BookInfo(n)
 		responseJSON, _ := json.Marshal(responseInfo)
 		fmt.Fprintf(w, "Response: %s\n", responseJSON)
-
 
 	}
 
