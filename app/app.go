@@ -13,14 +13,14 @@ type IncomingAddBook struct {
 	Title    string `json:"title"`
 	Author   string `json:"author"`
 	Category string `json:"category"`
-	Total    uint64    `json:"total"`
+	Total    uint64 `json:"total"`
 }
 
 // IncomingAddMovie : here you tell us what IncomingAddMovie is
 type IncomingAddMovie struct {
 	Title string   `json:"title"`
 	Genre []string `json:"genre"`
-	Total uint64      `json:"total"`
+	Total uint64   `json:"total"`
 }
 
 // IncomingRent : here you tell us what IncomingRent is
@@ -52,7 +52,6 @@ type Book struct {
 type Movie struct {
 	genre []string //["Drama", "Romance"]
 	Item
-	//total  int
 	copies uint64
 }
 
@@ -66,7 +65,6 @@ type itemBehave interface {
 	RentItem()
 	ReturnItem()
 }
-
 
 // Item : here you tell us what Item is
 type Item struct {
@@ -113,7 +111,6 @@ type UserDB struct {
 	mutex     sync.RWMutex
 }
 
-
 // NewLibrary : Constructor of Library struct
 func NewLibrary() *Library {
 
@@ -137,7 +134,6 @@ func NewLibrary() *Library {
 	}
 }
 
-
 // NewBook db :
 func (bdb *BookDB) addBookDB(ID uint64, title string, author string, category string, total uint64) {
 
@@ -155,7 +151,7 @@ func (bdb *BookDB) addBookDB(ID uint64, title string, author string, category st
 func (bdb *BookDB) getBookDB(ID uint64) (Book, error) {
 
 	if _, ok := bdb.bookDBMap[ID]; ok {
-		bdb.mutex.RLock()
+		bdb.mutex.Lock()
 
 		bookinfo := bdb.bookDBMap[ID]
 		bdb.mutex.Unlock()
@@ -168,13 +164,11 @@ func (bdb *BookDB) getBookDB(ID uint64) (Book, error) {
 // NewMovie db :
 func (mdb *MovieDB) addMovieDB(ID uint64, title string, genre []string, total uint64) {
 
-
 	mdb.mutex.Lock()
 	mdb.movieDBMap[ID] = &Movie{Item: Item{ID: ID, Title: title}, genre: genre}
 	mdb.mutex.Unlock()
 
 	atomic.AddUint64(&mdb.movieDBMap[ID].copies, total)
-
 
 }
 
@@ -188,7 +182,6 @@ func (udb *UserDB) addUserDB(it *Item, userid int) {
 	udb.mutex.Unlock()
 
 	fmt.Printf("this is the item %v for userid: %d\n", *udb.userDBMap[userid], userid)
-
 
 }
 
@@ -222,7 +215,6 @@ func (udb *UserDB) removeUserDB(it *Item, userid int) {
 
 }
 
-
 // AddBook : This could be a method implementing an interface -> additem
 func (l *Library) AddBook(title string, author string, category string, total uint64) ResponseAdd {
 
@@ -250,7 +242,6 @@ func (l *Library) AddMovie(title string, genre []string, total uint64) ResponseA
 	ID := l.autoinc
 
 	l.MovieDB.addMovieDB(ID, title, genre, total)
-
 
 	return ResponseAdd{
 		ID:      ID,
@@ -316,7 +307,6 @@ func (l *Library) RentBook(ID uint64, userid int) ResponseRent {
 
 	fmt.Printf("this is the book rented: %v\n", l.BookDB.bookDBMap[ID])
 
-
 	return ResponseRent{
 		Success: true,
 		Message: "",
@@ -339,7 +329,6 @@ func (l *Library) RentMovie(ID uint64, userid int) ResponseRent {
 
 		item := Item{}
 
-
 		item.ID = m.ID
 		item.Title = m.Title
 
@@ -348,7 +337,6 @@ func (l *Library) RentMovie(ID uint64, userid int) ResponseRent {
 		// Decrement
 
 		atomic.AddUint64(&l.MovieDB.movieDBMap[ID].copies, ^uint64(0))
-
 
 	} else {
 		return ResponseRent{
@@ -376,12 +364,9 @@ func (l *Library) ReturnBook(ID uint64, userid int) ResponseRent {
 
 		l.UserDB.removeUserDB(&item, userid)
 
-
 		atomic.AddUint64(&l.BookDB.bookDBMap[ID].copies, 1)
 
 		fmt.Printf("this is the book for return: %v\n", l.BookDB.bookDBMap[ID])
-
-
 
 	} else {
 		return ResponseRent{

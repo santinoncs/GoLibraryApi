@@ -118,6 +118,8 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 		n, _ := strconv.ParseUint(bookid[0], 10, 64)
 
+		fmt.Println(n)
+
 		responseInfo = library.BookInfo(n)
 		responseJSON, _ := json.Marshal(responseInfo)
 		fmt.Fprintf(w, "Response: %s\n", responseJSON)
