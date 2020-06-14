@@ -31,7 +31,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	var incomingrent app.IncomingRent
 	var responseAdd app.ResponseAdd
 	var responseRent app.ResponseRent
-	var responseInfo app.ResponseInfo
+	var responseInfoBook app.ResponseInfoBook
 
 	if r.URL.Path == "/book/add" {
 
@@ -73,7 +73,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		responseRent = library.RentBook(incomingrent.ID, incomingrent.UserID)
+		responseRent = library.Rent(incomingrent.ID, incomingrent.UserID)
 		responseJSON, _ := json.Marshal(responseRent)
 		fmt.Fprintf(w, "Response: %s\n", responseJSON)
 
@@ -89,7 +89,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		responseRent = library.RentMovie(incomingrent.ID, incomingrent.UserID)
+		responseRent = library.Rent(incomingrent.ID, incomingrent.UserID)
 		responseJSON, _ := json.Marshal(responseRent)
 		fmt.Fprintf(w, "Response: %s\n", responseJSON)
 
@@ -105,7 +105,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		responseRent = library.ReturnBook(incomingrent.ID, incomingrent.UserID)
+		responseRent = library.Return(incomingrent.ID, incomingrent.UserID)
 		responseJSON, _ := json.Marshal(responseRent)
 		fmt.Fprintf(w, "Response: %s\n", responseJSON)
 
@@ -120,8 +120,8 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 		fmt.Println(n)
 
-		responseInfo = library.BookInfo(n)
-		responseJSON, _ := json.Marshal(responseInfo)
+		responseInfoBook = library.BookInfo(n)
+		responseJSON, _ := json.Marshal(responseInfoBook)
 		fmt.Fprintf(w, "Response: %s\n", responseJSON)
 
 	}

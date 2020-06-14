@@ -1,7 +1,7 @@
 package app
 
 import (
-	"errors" // we would need this package
+	_ "errors" // we would need this package
 	"fmt"
 	"sync"
 	"sync/atomic" // we could need this
@@ -33,10 +33,10 @@ type IncomingRent struct {
 type Library struct {
 	Book
 	Movie
-	BookDB
-	MovieDB
+	BookDB []Book
+	ItemDB
+	MovieDB []Movie
 	UserDB
-	User
 	autoinc uint64
 }
 
@@ -45,32 +45,26 @@ type Book struct {
 	Item
 	Author   string
 	Category string
-	copies   uint64
+}
+
+// RentableItem : here you tell us what RentableItem is
+type RentableItem interface {
+	getItemID() uint64
+	getItemTitle() string
+	getItemCopies() uint64
 }
 
 // Movie : Movie struct
 type Movie struct {
 	genre []string //["Drama", "Romance"]
 	Item
-	copies uint64
-}
-
-// User : User struct
-type User struct {
-	userID int
-}
-
-// itemBehave : here you tell us what Item is
-type itemBehave interface {
-	RentItem()
-	ReturnItem()
 }
 
 // Item : here you tell us what Item is
 type Item struct {
-	ID    uint64
-	Title string
-	itemBehave
+	ID     uint64
+	Title  string
+	Copies uint64
 }
 
 // ResponseAdd : ResponseAdd ack to add movie/book
@@ -86,16 +80,29 @@ type ResponseRent struct {
 	Message string
 }
 
-// ResponseInfo : ResponseInfo
-type ResponseInfo struct {
+// ResponseInfoBook : ResponseInfoBook
+type ResponseInfoBook struct {
 	Success bool
 	Message string
 	Book
 }
 
+// ResponseInfoMovie : ResponseInfoMovie
+type ResponseInfoMovie struct {
+	Success bool
+	Message string
+	Movie
+}
+
 // BookDB : BookDB
 type BookDB struct {
 	bookDBMap map[uint64]*Book
+	mutex     sync.RWMutex
+}
+
+// ItemDB : ItemDB
+type ItemDB struct {
+	itemDBMap map[uint64]RentableItem
 	mutex     sync.RWMutex
 }
 
@@ -111,84 +118,128 @@ type UserDB struct {
 	mutex     sync.RWMutex
 }
 
+func (i Item) getItemID() uint64 {
+	return i.ID
+}
+
+func (i Item) getItemTitle() string {
+	return i.Title
+}
+
+func (i Item) getItemCopies() uint64 {
+	return i.Copies
+}
+
 // NewLibrary : Constructor of Library struct
 func NewLibrary() *Library {
 
-	var bookDBMap = make(map[uint64]*Book)
-	var movieDBMap = make(map[uint64]*Movie)
+	var itemDBMap = make(map[uint64]RentableItem)
 	var userDBMap = make(map[int]*[]Item)
 
+	var BookDB = []Book{}
+	var MovieDB = []Movie{}
+
 	return &Library{
-		BookDB: BookDB{
-			bookDBMap: bookDBMap,
+		BookDB: BookDB,
+		ItemDB: ItemDB{
+			itemDBMap: itemDBMap,
 		},
-		MovieDB: MovieDB{
-			movieDBMap: movieDBMap,
-		},
+		MovieDB: MovieDB,
 		UserDB: UserDB{
 			userDBMap: userDBMap,
 		},
 		Book:  Book{Item: Item{}},
 		Movie: Movie{Item: Item{}},
-		User:  User{},
 	}
 }
 
-// NewBook db :
-func (bdb *BookDB) addBookDB(ID uint64, title string, author string, category string, total uint64) {
+// addItemDB db :
+func (idb *ItemDB) addItemDB(ID uint64, title string, copies uint64) {
 
-	bdb.mutex.Lock()
-	bdb.bookDBMap[ID] = &Book{Item: Item{ID: ID, Title: title}, Author: author, Category: category}
-	bdb.mutex.Unlock()
+	if _, ok := idb.itemDBMap[ID]; ok {
 
-	atomic.AddUint64(&bdb.bookDBMap[ID].copies, total)
+		idb.mutex.Lock()
+		copiesCurr := idb.itemDBMap[ID].getItemCopies()
+		copies = copiesCurr + copies
+		idb.itemDBMap[ID] = Item{ID: ID, Title: title, Copies: copies}
+		idb.mutex.Unlock()
 
-	fmt.Printf("this is the book added: %v\n", bdb.bookDBMap[ID])
-
-}
-
-// getBookDB : getBookDB
-func (bdb *BookDB) getBookDB(ID uint64) (Book, error) {
-
-	if _, ok := bdb.bookDBMap[ID]; ok {
-		bdb.mutex.Lock()
-
-		bookinfo := bdb.bookDBMap[ID]
-		bdb.mutex.Unlock()
-		return *bookinfo, nil
+	} else {
+		idb.mutex.Lock()
+		idb.itemDBMap[ID] = Item{ID: ID, Title: title, Copies: copies}
+		idb.mutex.Unlock()
 	}
-	return Book{}, errors.New("Item does not exist")
+
+	fmt.Printf("Method addItemDB. Item Added: %v\n", idb.itemDBMap[ID])
 
 }
 
-// NewMovie db :
-func (mdb *MovieDB) addMovieDB(ID uint64, title string, genre []string, total uint64) {
+// addItemDB db :
+func (idb *ItemDB) removeItemDB(ID uint64, title string, copies uint64) {
 
-	mdb.mutex.Lock()
-	mdb.movieDBMap[ID] = &Movie{Item: Item{ID: ID, Title: title}, genre: genre}
-	mdb.mutex.Unlock()
+	if _, ok := idb.itemDBMap[ID]; ok {
+		idb.mutex.Lock()
 
-	atomic.AddUint64(&mdb.movieDBMap[ID].copies, total)
+		copiesCurr := idb.itemDBMap[ID].getItemCopies()
+
+		copies = copiesCurr - copies
+		idb.itemDBMap[ID] = Item{ID: ID, Title: title, Copies: copies}
+		idb.mutex.Unlock()
+	} else {
+
+		idb.mutex.Lock()
+		idb.itemDBMap[ID] = Item{ID: ID, Title: title, Copies: copies}
+		idb.mutex.Unlock()
+
+	}
+
+	fmt.Printf("Method removeItemDB. Item removed: %v\n", idb.itemDBMap[ID])
+
+}
+
+// Initialize userdbmap
+func (udb *UserDB) init(userid int) {
+
+	if _, ok := udb.userDBMap[userid]; ok {
+		fmt.Printf("userdb is present in map\n")
+	} else {
+		fmt.Printf("Initialize userdb\n")
+		udb.userDBMap = map[int]*[]Item{
+			userid: {},
+		}
+	}
+}
+
+// FindUserDB : find item in the userdbMap slice
+func (udb *UserDB) FindUserDB(it *Item, userid int) bool {
+
+	arr := *udb.userDBMap[userid]
+
+	for _, item := range arr {
+		if item == *it {
+			return true
+		}
+	}
+
+	return false
 
 }
 
 // addUserDB : addUserDB
 func (udb *UserDB) addUserDB(it *Item, userid int) {
 
-	fmt.Printf("Adding the item %v:\n", *it)
+	it.Copies = 0
 
 	udb.mutex.Lock()
 	*udb.userDBMap[userid] = append(*udb.userDBMap[userid], *it)
 	udb.mutex.Unlock()
 
-	fmt.Printf("this is the item %v for userid: %d\n", *udb.userDBMap[userid], userid)
+	fmt.Printf("Method addUserDB. This is the item %v for userid: %d after adding\n", *udb.userDBMap[userid], userid)
 
 }
 
 // removeUserDB : removeUserDB
 func (udb *UserDB) removeUserDB(it *Item, userid int) {
-
-	fmt.Printf("Removing in removeuserdb the item %v:\n", *it)
 
 	udb.mutex.Lock()
 
@@ -197,11 +248,8 @@ func (udb *UserDB) removeUserDB(it *Item, userid int) {
 	i := 0 // output index
 	for _, x := range *udb.userDBMap[userid] {
 		if x == *it {
-			// copy and increment index
-			//arr[i] = x
-			//i++
+			fmt.Println("Match with an element")
 		} else {
-			// son diferentes, copia el elemento en el array
 			arr[i] = x
 			i++
 		}
@@ -213,16 +261,36 @@ func (udb *UserDB) removeUserDB(it *Item, userid int) {
 
 	udb.mutex.Unlock()
 
+	fmt.Printf("Method removeUserDB. This is the item %v for userid: %d after removal\n", *udb.userDBMap[userid], userid)
+
 }
 
-// AddBook : This could be a method implementing an interface -> additem
+// AddBook :
 func (l *Library) AddBook(title string, author string, category string, total uint64) ResponseAdd {
+
+	for _, book := range l.BookDB {
+		if title == book.Title {
+			return ResponseAdd{
+				ID:      book.ID,
+				Success: false,
+				Message: "Already exists",
+			}
+		}
+	}
 
 	atomic.AddUint64(&l.autoinc, 1)
 
 	ID := l.autoinc
 
-	l.BookDB.addBookDB(ID, title, author, category, total)
+	l.ItemDB.addItemDB(ID, title, total)
+
+	l.Book.Author = author
+	l.Book.Category = category
+	l.Book.Item.ID = ID
+	l.Book.Item.Title = title
+	l.Book.Item.Copies = total
+
+	l.BookDB = append(l.BookDB, l.Book)
 
 	response := ResponseAdd{
 		ID:      ID,
@@ -237,40 +305,46 @@ func (l *Library) AddBook(title string, author string, category string, total ui
 // AddMovie : AddMovie
 func (l *Library) AddMovie(title string, genre []string, total uint64) ResponseAdd {
 
+	for _, movie := range l.MovieDB {
+		if title == movie.Title {
+			return ResponseAdd{
+				ID:      movie.ID,
+				Success: false,
+				Message: "Already exists",
+			}
+		}
+	}
+
 	atomic.AddUint64(&l.autoinc, 1)
 
 	ID := l.autoinc
 
-	l.MovieDB.addMovieDB(ID, title, genre, total)
+	l.ItemDB.addItemDB(ID, title, total)
 
-	return ResponseAdd{
+	l.Movie.genre = genre
+	l.Movie.Item.ID = ID
+	l.Movie.Item.Title = title
+
+	l.MovieDB = append(l.MovieDB, l.Movie)
+
+	response := ResponseAdd{
 		ID:      ID,
 		Success: true,
 		Message: "",
 	}
 
+	return response
+
 }
 
-// RentBook : RentBook
-func (l *Library) RentBook(ID uint64, userid int) ResponseRent {
+// Rent : Rent
+func (l *Library) Rent(ID uint64, userid int) ResponseRent {
 
-	// if the userid does not exists, first initialize !!!
-	// ask Oleg here about the initialization of map
 
-	if _, ok := l.UserDB.userDBMap[userid]; ok {
-		fmt.Printf("userdb is present in map\n")
-	} else {
-		fmt.Printf("Initialize userdb\n")
-		l.UserDB.userDBMap = map[int]*[]Item{
-			userid: {},
-		}
-	}
+	l.UserDB.init(userid)
 
-	if b, ok := l.BookDB.bookDBMap[ID]; ok {
-
-		fmt.Printf("Exists, you can rent it. With ID: %d and Title: %s\n", b.ID, b.Title)
-
-		fmt.Printf("the actual slice lenght is: %d\n", len(*l.UserDB.userDBMap[userid]))
+	if b, ok := l.ItemDB.itemDBMap[ID]; ok {
+		fmt.Println("You can rent it")
 
 		if len(*l.UserDB.userDBMap[userid]) >= 2 {
 			return ResponseRent{
@@ -281,14 +355,16 @@ func (l *Library) RentBook(ID uint64, userid int) ResponseRent {
 
 		item := Item{}
 
-		item.ID = b.ID
-		item.Title = b.Title
+		item.ID = b.getItemID()
+		item.Title = b.getItemTitle()
+		item.Copies = b.getItemCopies()
 
 		l.UserDB.addUserDB(&item, userid)
 
-		if l.BookDB.bookDBMap[ID].copies > 0 {
+		if (l.ItemDB.itemDBMap[ID].getItemCopies()) > 0 {
 			fmt.Printf("Exists, and there are more than 0 copies\n")
-			atomic.AddUint64(&l.BookDB.bookDBMap[ID].copies, ^uint64(0))
+
+			l.ItemDB.removeItemDB(ID, item.Title, 1)
 
 		} else {
 			fmt.Printf("0 copies\n")
@@ -301,47 +377,7 @@ func (l *Library) RentBook(ID uint64, userid int) ResponseRent {
 	} else {
 		return ResponseRent{
 			Success: false,
-			Message: "Does no exists in the book db",
-		}
-	}
-
-	fmt.Printf("this is the book rented: %v\n", l.BookDB.bookDBMap[ID])
-
-	return ResponseRent{
-		Success: true,
-		Message: "",
-	}
-
-}
-
-// RentMovie : RentMovie
-func (l *Library) RentMovie(ID uint64, userid int) ResponseRent {
-
-	if _, ok := l.UserDB.userDBMap[userid]; ok {
-		fmt.Printf("userdb is present in map\n")
-	} else {
-		l.UserDB.userDBMap = map[int]*[]Item{
-			userid: {},
-		}
-	}
-
-	if m, ok := l.MovieDB.movieDBMap[ID]; ok {
-
-		item := Item{}
-
-		item.ID = m.ID
-		item.Title = m.Title
-
-		l.UserDB.addUserDB(&item, userid)
-
-		// Decrement
-
-		atomic.AddUint64(&l.MovieDB.movieDBMap[ID].copies, ^uint64(0))
-
-	} else {
-		return ResponseRent{
-			Success: false,
-			Message: "Error",
+			Message: "Does no exists in the item db",
 		}
 	}
 
@@ -352,26 +388,34 @@ func (l *Library) RentMovie(ID uint64, userid int) ResponseRent {
 
 }
 
-// ReturnBook : ReturnBook
-func (l *Library) ReturnBook(ID uint64, userid int) ResponseRent {
+// Return : Return
+func (l *Library) Return(ID uint64, userid int) ResponseRent {
 
-	if b, ok := l.BookDB.bookDBMap[ID]; ok {
+	if b, ok := l.ItemDB.itemDBMap[ID]; ok {
 
 		item := Item{}
 
-		item.ID = b.ID
-		item.Title = b.Title
+		item.ID = b.getItemID()
+		item.Title = b.getItemTitle()
+		item.Copies = b.getItemCopies()
+
+		l.ItemDB.addItemDB(ID, item.Title, 1)
+
+		found := l.UserDB.FindUserDB(&item, userid)
+		if !found {
+			fmt.Println("Value not found in slice")
+			return ResponseRent{
+				Success: false,
+				Message: "You cannot return as it is not rented",
+			}
+		}
 
 		l.UserDB.removeUserDB(&item, userid)
 
-		atomic.AddUint64(&l.BookDB.bookDBMap[ID].copies, 1)
-
-		fmt.Printf("this is the book for return: %v\n", l.BookDB.bookDBMap[ID])
-
 	} else {
 		return ResponseRent{
 			Success: false,
-			Message: "Does not exists in bookDB",
+			Message: "Does not exists in itemDB",
 		}
 	}
 
@@ -383,21 +427,43 @@ func (l *Library) ReturnBook(ID uint64, userid int) ResponseRent {
 }
 
 // BookInfo : BookInfo
-func (l *Library) BookInfo(bookid uint64) ResponseInfo {
+func (l *Library) BookInfo(bookid uint64) ResponseInfoBook {
 
-	bookinfo, err := l.BookDB.getBookDB(bookid)
-	if err != nil {
-		return ResponseInfo{
-			Success: false,
-			Message: "Error",
-			Book:    Book{},
+	for _, n := range l.BookDB {
+		if n.ID == bookid {
+			return ResponseInfoBook{
+				Success: true,
+				Message: "",
+				Book:    Book{Item: Item{ID: bookid, Title: l.ItemDB.itemDBMap[bookid].getItemTitle(), Copies: l.ItemDB.itemDBMap[bookid].getItemCopies()}, Author: n.Author, Category: n.Category},
+			}
 		}
 	}
 
-	return ResponseInfo{
-		Success: true,
-		Message: "",
-		Book:    bookinfo,
+	return ResponseInfoBook{
+		Success: false,
+		Message: "Error",
+		Book:    Book{},
+	}
+
+}
+
+// MovieInfo : MovieInfo
+func (l *Library) MovieInfo(movieid uint64) ResponseInfoMovie {
+
+	for _, n := range l.MovieDB {
+		if n.ID == movieid {
+			return ResponseInfoMovie{
+				Success: true,
+				Message: "",
+				Movie:   Movie{Item: Item{ID: movieid, Title: l.ItemDB.itemDBMap[movieid].getItemTitle(), Copies: l.ItemDB.itemDBMap[movieid].getItemCopies()}, genre: n.genre},
+			}
+		}
+	}
+
+	return ResponseInfoMovie{
+		Success: false,
+		Message: "Error",
+		Movie:   Movie{},
 	}
 
 }
