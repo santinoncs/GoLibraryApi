@@ -183,15 +183,13 @@ func (idb *ItemDB) removeItemDB(ID uint64, title string, copies uint64) {
 		copiesCurr := idb.itemDBMap[ID].getItemCopies()
 
 		copies = copiesCurr - copies
-		idb.itemDBMap[ID] = Item{ID: ID, Title: title, Copies: copies}
-		idb.mutex.Unlock()
-	} else {
 
+	}
 		idb.mutex.Lock()
 		idb.itemDBMap[ID] = Item{ID: ID, Title: title, Copies: copies}
 		idb.mutex.Unlock()
 
-	}
+
 
 	fmt.Printf("Method removeItemDB. Item removed: %v\n", idb.itemDBMap[ID])
 
@@ -211,7 +209,7 @@ func (udb *UserDB) init(userid int) {
 }
 
 // FindUserDB : find item in the userdbMap slice
-func (udb *UserDB) FindUserDB(it *Item, userid int) bool {
+func (udb *UserDB) findItemInUserDb(it *Item, userid int) bool {
 
 	arr := *udb.userDBMap[userid]
 
@@ -225,8 +223,8 @@ func (udb *UserDB) FindUserDB(it *Item, userid int) bool {
 
 }
 
-// addUserDB : addUserDB
-func (udb *UserDB) addUserDB(it *Item, userid int) {
+// addItemToUserDb : addItemToUserDb
+func (udb *UserDB) addItemToUserDb(it *Item, userid int) {
 
 	it.Copies = 0
 
@@ -234,7 +232,7 @@ func (udb *UserDB) addUserDB(it *Item, userid int) {
 	*udb.userDBMap[userid] = append(*udb.userDBMap[userid], *it)
 	udb.mutex.Unlock()
 
-	fmt.Printf("Method addUserDB. This is the item %v for userid: %d after adding\n", *udb.userDBMap[userid], userid)
+	fmt.Printf("Method addItemToUserDb. This is the item %v for userid: %d after adding\n", *udb.userDBMap[userid], userid)
 
 }
 
@@ -359,10 +357,12 @@ func (l *Library) Rent(ID uint64, userid int) ResponseRent {
 		item.Title = b.getItemTitle()
 		item.Copies = b.getItemCopies()
 
-		l.UserDB.addUserDB(&item, userid)
 
 		if (l.ItemDB.itemDBMap[ID].getItemCopies()) > 0 {
 			fmt.Printf("Exists, and there are more than 0 copies\n")
+
+			l.UserDB.addItemToUserDb(&item, userid)
+
 
 			l.ItemDB.removeItemDB(ID, item.Title, 1)
 
@@ -399,9 +399,9 @@ func (l *Library) Return(ID uint64, userid int) ResponseRent {
 		item.Title = b.getItemTitle()
 		item.Copies = b.getItemCopies()
 
-		l.ItemDB.addItemDB(ID, item.Title, 1)
+		
 
-		found := l.UserDB.FindUserDB(&item, userid)
+		found := l.UserDB.findItemInUserDb(&item, userid)
 		if !found {
 			fmt.Println("Value not found in slice")
 			return ResponseRent{
@@ -409,6 +409,8 @@ func (l *Library) Return(ID uint64, userid int) ResponseRent {
 				Message: "You cannot return as it is not rented",
 			}
 		}
+
+		l.ItemDB.addItemDB(ID, item.Title, 1)
 
 		l.UserDB.removeUserDB(&item, userid)
 
